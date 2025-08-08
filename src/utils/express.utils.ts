@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { ClientSession } from "mongoose";
 import httpStatus from "http-status";
 import { Request, Response, NextFunction } from "express";
 import logger from "../logger/logger";
@@ -37,10 +37,7 @@ class ApiError extends Error {
   }
 }
 
-const pick = <T extends Record<string, any>>(
-  object: T,
-  keys: (keyof T)[]
-): Partial<T> => {
+const pick = <T extends Record<string, any>>(object: T, keys: (keyof T)[]): Partial<T> => {
   return keys.reduce((obj, key) => {
     if (object && Object.prototype.hasOwnProperty.call(object, key)) {
       obj[key] = object[key];
@@ -73,13 +70,7 @@ interface ResponseObject {
   type?: string;
 }
 
-const createResponseObject = ({
-  req,
-  message = "",
-  payload = {},
-  code,
-  type,
-}: ResponseObject) => {
+const createResponseObject = ({ req, message = "", payload = {}, code, type }: ResponseObject) => {
   return { code, message, type, payload };
 };
 
@@ -96,14 +87,7 @@ const errorConverter = (
         ? httpStatus.BAD_REQUEST
         : httpStatus.INTERNAL_SERVER_ERROR;
     const message = error.message || httpStatus[statusCode];
-    error = new ApiError(
-      statusCode,
-      message,
-      error,
-      error?.errorType || "",
-      false,
-      err.stack
-    );
+    error = new ApiError(statusCode, message, error, error?.errorType || "", false, err.stack);
   }
   next(error);
 };
@@ -142,11 +126,4 @@ const errorHandler = (
   res.status(statusCode).send(createResponseObject(data4responseObject));
 };
 
-export {
-  ApiError,
-  pick,
-  catchAsync,
-  createResponseObject,
-  errorConverter,
-  errorHandler,
-};
+export { ApiError, pick, catchAsync, createResponseObject, errorConverter, errorHandler };

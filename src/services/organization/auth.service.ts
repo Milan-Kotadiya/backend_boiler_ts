@@ -1,12 +1,9 @@
-import mongoose, { Document, Model } from "mongoose";
+import mongoose, { ClientSession, Document, Model } from "mongoose";
 import jwt from "jsonwebtoken";
 import { authTypes } from "../../constants/event.handler";
 import { Socket } from "socket.io";
 import { Request, Response, NextFunction } from "express";
-import {
-  getUsersModel,
-  IUser,
-} from "../../models/dynamic_models/organization_user.model";
+import { getUsersModel, IUser } from "../../models/dynamic_models/organization_user.model";
 import { config } from "../../config/dotenv.config";
 
 const { JWT_SECRET, ACCESS_TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY } = config;
@@ -25,6 +22,7 @@ export interface OrganizationAuthResponse {
 
 export interface AuthenticatedOrganizationRequest extends Request {
   organization: IUser;
+  session?: ClientSession;
 }
 /**
  * 🔹 Generate a JWT token
@@ -117,15 +115,9 @@ const login = async (
 /**
  * 🔹 Logout a user
  */
-const logout = async (
-  socketId: string,
-  organizationId: string
-): Promise<void> => {
+const logout = async (socketId: string, organizationId: string): Promise<void> => {
   const User: Model<IUser> = await getUsersModel(organizationId);
-  await User.findOneAndUpdate(
-    { socketId },
-    { isOnline: false, lastSeen: new Date() }
-  );
+  await User.findOneAndUpdate({ socketId }, { isOnline: false, lastSeen: new Date() });
 };
 
 /**
@@ -181,17 +173,11 @@ const socketAuth = async (
  */
 const expressAuth =
   (organizationId: string) =>
-  async (
-    req: AuthenticatedOrganizationRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
+  async (req: AuthenticatedOrganizationRequest, res: Response, next: NextFunction) => {
     const User: Model<IUser> = await getUsersModel(organizationId);
-    const access_token =
-      req.headers.authorization?.split(" ")[1] || req.cookies?.access_token;
+    const access_token = req.headers.authorization?.split(" ")[1] || req.cookies?.access_token;
 
-    if (!access_token)
-      return res.status(401).json({ error: "Access token is required" });
+    if (!access_token) return res.status(401).json({ error: "Access token is required" });
 
     const { data, error_message, code } = verifyAndDecodeToken(access_token);
 
@@ -245,10 +231,7 @@ const refreshTokensSocket = async (
   organizationId: string
 ): Promise<OrganizationAuthResponse> => {
   const refresh_token_old = socket?.handshake?.auth?.refresh_token;
-  const { access_token, refresh_token } = await refreshTokens(
-    refresh_token_old,
-    organizationId
-  );
+  const { access_token, refresh_token } = await refreshTokens(refresh_token_old, organizationId);
 
   socket.handshake.auth = {
     ...socket.handshake.auth,
